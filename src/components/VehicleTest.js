@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import vehicleService from '../services/vehicleService';
+import driverService from '../services/driverService'; // Importar el servicio de conductores
 import authService from '../services/authService';
 import { VEHICLE_TYPES, VEHICLE_STATUS } from '../config/api';
 import './VehicleTest.css';
@@ -9,6 +10,7 @@ const VehicleTest = () => {
   const navigate = useNavigate();
   const [state, setState] = useState({
     vehicles: [],
+    drivers: [], // Agregar lista de conductores
     filteredVehicles: [],
     loading: false,
     error: '',
@@ -21,11 +23,12 @@ const VehicleTest = () => {
       brand: '',
       model: '',
       year: '',
-      status: VEHICLE_STATUS.AVAILABLE
+      status: VEHICLE_STATUS.AVAILABLE,
+      driverId: '' // Agregar campo para el conductor
     }
   });
 
-  const { vehicles, filteredVehicles, loading, error, showModal, searchTerm, newVehicle } = state;
+  const { vehicles, drivers, filteredVehicles, loading, error, showModal, searchTerm, newVehicle } = state;
 
   const updateState = (updates) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -35,17 +38,34 @@ const VehicleTest = () => {
     updateState({ loading: true, error: '' });
     try {
       const data = await vehicleService.listVehicles();
-      updateState({ 
+      updateState({
         vehicles: data.vehicles || [],
         filteredVehicles: data.vehicles || [],
-        loading: false 
+        loading: false
       });
     } catch (err) {
-      updateState({ 
+      updateState({
         error: err.message || 'Error al cargar vehículos',
-        loading: false 
+        loading: false
       });
       console.error('Error al cargar vehículos:', err);
+    }
+  };
+
+  const loadDrivers = async () => {
+    updateState({ loading: true, error: '' });
+    try {
+      const driversData = await driverService.listDrivers();
+      updateState({
+        drivers: driversData,
+        loading: false
+      });
+    } catch (err) {
+      updateState({
+        error: err.message || 'Error al cargar conductores',
+        loading: false
+      });
+      console.error('Error al cargar conductores:', err);
     }
   };
 
@@ -76,7 +96,8 @@ const VehicleTest = () => {
         brand: vehicle.brand,
         model: vehicle.model,
         year: vehicle.year.toString(),
-        status: vehicle.status || VEHICLE_STATUS.AVAILABLE
+        status: vehicle.status || VEHICLE_STATUS.AVAILABLE,
+        driverId: vehicle.driverId || '' // Agregar ID del conductor si existe
       }
     });
   };
@@ -97,7 +118,8 @@ const VehicleTest = () => {
         type: newVehicle.type,
         brand: newVehicle.brand,
         model: newVehicle.model,
-        year: parseInt(newVehicle.year)
+        year: parseInt(newVehicle.year),
+        driverId: newVehicle.driverId // Agregar conductor al guardar
       };
 
       let result;
@@ -128,7 +150,8 @@ const VehicleTest = () => {
           brand: '',
           model: '',
           year: '',
-          status: VEHICLE_STATUS.AVAILABLE
+          status: VEHICLE_STATUS.AVAILABLE,
+          driverId: '' // Resetear ID de conductor
         }
       });
     } catch (err) {
@@ -136,9 +159,9 @@ const VehicleTest = () => {
       if (err.message.includes('422')) {
         errorMessage = 'Error de validación: ' + err.message.replace(/.*Error 422: /, '');
       }
-      updateState({ 
+      updateState({
         error: errorMessage,
-        loading: false 
+        loading: false
       });
       console.error('Error al guardar vehículo:', err);
     }
@@ -173,13 +196,14 @@ const VehicleTest = () => {
       return;
     }
     loadVehicles();
+    loadDrivers(); // Cargar conductores al inicio
   }, [navigate]);
 
   return (
     <div className="driver-container">
       <div className="driver-header-container">
         <h1 className="driver-header">Gestión de Vehículos</h1>
-        
+
         <div className="driver-search-container">
           <div className="search-bar">
             <input
@@ -193,9 +217,9 @@ const VehicleTest = () => {
               🔍
             </button>
           </div>
-          
-          <button 
-            onClick={() => updateState({ 
+
+          <button
+            onClick={() => updateState({
               showModal: true,
               newVehicle: {
                 id: null,
@@ -204,7 +228,8 @@ const VehicleTest = () => {
                 brand: '',
                 model: '',
                 year: '',
-                status: VEHICLE_STATUS.AVAILABLE
+                status: VEHICLE_STATUS.AVAILABLE,
+                driverId: '' // Resetear conductor
               }
             })}
             className="driver-button driver-button-primary"
@@ -217,7 +242,7 @@ const VehicleTest = () => {
 
       {error && (
         <div className="driver-error">
-          <span>⚠️</span> 
+          <span>⚠️</span>
           <div className="error-message">{error}</div>
           {error.includes('Sesión expirada') && (
             <button onClick={handleLoginRedirect} className="button secondary">
@@ -244,6 +269,7 @@ const VehicleTest = () => {
                   <th>Modelo</th>
                   <th>Año</th>
                   <th>Estado</th>
+                  <th>Conductor</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -261,14 +287,14 @@ const VehicleTest = () => {
                           {vehicle.status}
                         </span>
                       </td>
+                      <td>{vehicle.driverName || 'No asignado'}</td>
                       <td className="actions-cell">
-                        <button 
+                        <button
                           className="driver-action-button edit"
                           onClick={() => handleEditVehicle(vehicle)}
                           disabled={loading}
                           title="Editar vehículo"
                         >
-                         
                           <span className="text">Editar</span>
                         </button>
                       </td>
@@ -276,7 +302,7 @@ const VehicleTest = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" className="driver-table-empty">
+                    <td colSpan="8" className="driver-table-empty">
                       {searchTerm ? 'No se encontraron resultados' : 'No hay vehículos registrados'}
                     </td>
                   </tr>
@@ -292,8 +318,8 @@ const VehicleTest = () => {
           <div className="driver-modal">
             <div className="driver-modal-header">
               <h2>{newVehicle.id ? 'Editar Vehículo' : 'Registrar Nuevo Vehículo'}</h2>
-              <button 
-                onClick={() => updateState({ 
+              <button
+                onClick={() => updateState({
                   showModal: false,
                   newVehicle: {
                     id: null,
@@ -302,7 +328,8 @@ const VehicleTest = () => {
                     brand: '',
                     model: '',
                     year: '',
-                    status: VEHICLE_STATUS.AVAILABLE
+                    status: VEHICLE_STATUS.AVAILABLE,
+                    driverId: '' // Resetear conductor
                   }
                 })}
                 className="driver-modal-close"
@@ -311,8 +338,24 @@ const VehicleTest = () => {
                 ×
               </button>
             </div>
-            
+
             <form onSubmit={handleSaveVehicle} className="driver-form">
+              {/* Campo de conductor */}
+              <div className="form-group">
+                <label htmlFor="vehicle-driver">Conductor</label>
+                <select
+                  id="vehicle-driver"
+                  name="driverId"
+                  value={newVehicle.driverId}
+                  onChange={handleInputChange}
+                >
+                  <option value="">Seleccione un conductor</option>
+                  {drivers.map(driver => (
+                    <option key={driver.id} value={driver.id}>{driver.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="form-group">
                 <label htmlFor="vehicle-plate">Placa*</label>
                 <input
@@ -327,7 +370,7 @@ const VehicleTest = () => {
                   disabled={newVehicle.id}
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="vehicle-type">Tipo*</label>
                 <select
@@ -343,7 +386,7 @@ const VehicleTest = () => {
                   <option value={VEHICLE_TYPES.HEAVY}>{VEHICLE_TYPES.HEAVY}</option>
                 </select>
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="vehicle-brand">Marca*</label>
                 <input
@@ -356,7 +399,7 @@ const VehicleTest = () => {
                   disabled={newVehicle.id}
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="vehicle-model">Modelo*</label>
                 <input
@@ -369,7 +412,7 @@ const VehicleTest = () => {
                   disabled={newVehicle.id}
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="vehicle-year">Año*</label>
                 <input
@@ -384,7 +427,7 @@ const VehicleTest = () => {
                   disabled={newVehicle.id}
                 />
               </div>
-              
+
               {newVehicle.id && (
                 <div className="form-group">
                   <label htmlFor="vehicle-status">Estado*</label>
@@ -402,11 +445,11 @@ const VehicleTest = () => {
                   </select>
                 </div>
               )}
-              
+
               <div className="form-actions">
-                <button 
+                <button
                   type="button"
-                  onClick={() => updateState({ 
+                  onClick={() => updateState({
                     showModal: false,
                     newVehicle: {
                       id: null,
@@ -415,7 +458,8 @@ const VehicleTest = () => {
                       brand: '',
                       model: '',
                       year: '',
-                      status: VEHICLE_STATUS.AVAILABLE
+                      status: VEHICLE_STATUS.AVAILABLE,
+                      driverId: '' // Resetear conductor
                     }
                   })}
                   className="button secondary"
@@ -423,8 +467,8 @@ const VehicleTest = () => {
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="button primary"
                   disabled={loading}
                 >

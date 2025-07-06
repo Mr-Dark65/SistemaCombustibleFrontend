@@ -1,13 +1,43 @@
-import { buildApiUrl, API_CONFIG, VEHICLE_TYPES, VEHICLE_STATUS } from '../config/api';
+import { buildApiUrl, API_CONFIG } from '../config/api';
 import authService from './authService';
 
 class VehicleService {
+  // Crear un nuevo vehículo
+  async createVehicle(plate, type, brand, model, year) {
+    try {
+      const url = new URL(buildApiUrl(API_CONFIG.ENDPOINTS.VEHICLES));
+      url.searchParams.append('plate', plate);
+      url.searchParams.append('type', type);
+      url.searchParams.append('brand', brand);
+      url.searchParams.append('model', model);
+      url.searchParams.append('year', year);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'token': authService.getToken(),
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al crear vehículo');
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw new Error(error.message || 'Error de conexión');
+    }
+  }
+
+  // Listar todos los vehículos
   async listVehicles(typeFilter = null, statusFilter = null) {
     try {
       const url = new URL(buildApiUrl(API_CONFIG.ENDPOINTS.VEHICLES));
       if (typeFilter) url.searchParams.append('type_filter', typeFilter);
       if (statusFilter) url.searchParams.append('status_filter', statusFilter);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -16,61 +46,41 @@ class VehicleService {
         }
       });
 
-      console.log('Respuesta de GET /vehicles:', response.status, response.statusText);
-      const data = await response.json();
-      console.log('Datos de GET /vehicles:', data);
-
       if (!response.ok) {
-        const error = await this._handleErrorResponse(response, data);
-        throw error;
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al listar vehículos');
       }
 
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('Error en listVehicles:', error);
-      throw error;
+      throw new Error(error.message || 'Error de conexión');
     }
   }
 
-  async createVehicle(plate, type, brand, model, year) {
+  // Obtener un vehículo específico
+  async getVehicle(vehicleId) {
     try {
-      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.VEHICLES), {
-        method: 'POST',
+      const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.VEHICLES}/${vehicleId}`), {
+        method: 'GET',
         headers: {
           'token': authService.getToken(),
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          plate,
-          type,
-          brand,
-          model,
-          year: parseInt(year)
-        })
+        }
       });
 
-      console.log('Respuesta de POST /vehicles:', response.status, response.statusText);
-      const data = await response.json();
-      console.log('Datos de POST /vehicles:', data);
-
       if (!response.ok) {
-        const error = await this._handleErrorResponse(response, data);
-        throw error;
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al obtener vehículo');
       }
 
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('Error en createVehicle:', error);
-      throw error;
+      throw new Error(error.message || 'Error de conexión');
     }
   }
 
+  // Actualizar estado de un vehículo
   async updateVehicleStatus(vehicleId, newStatus) {
-    const validStatuses = Object.values(VEHICLE_STATUS);
-    if (!validStatuses.includes(newStatus)) {
-      throw new Error(`Estado inválido: ${newStatus}. Debe ser uno de: ${validStatuses.join(', ')}`);
-    }
-
     try {
       const url = new URL(buildApiUrl(`${API_CONFIG.ENDPOINTS.VEHICLES}/${vehicleId}/status`));
       url.searchParams.append('new_status', newStatus);
@@ -79,46 +89,45 @@ class VehicleService {
         method: 'PUT',
         headers: {
           'token': authService.getToken(),
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
 
-      console.log('Respuesta de PUT /vehicles/:id/status:', response.status, response.statusText);
-      console.log('URL enviada en PUT /vehicles/:id/status:', url.toString());
-      const data = await response.json();
-      console.log('Datos de PUT /vehicles/:id/status:', data);
-
       if (!response.ok) {
-        const error = await this._handleErrorResponse(response, data);
-        throw error;
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al actualizar estado del vehículo');
       }
 
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('Error en updateVehicleStatus:', error);
-      throw error;
+      throw new Error(error.message || 'Error de conexión');
     }
   }
 
-  async _handleErrorResponse(response, errorData = null) {
-    if (response.status === 401) {
-      authService.logout();
-      return new Error('Sesión expirada. Por favor inicie sesión nuevamente');
-    }
-
+  // Asignar conductor a un vehículo
+  async assignDriver(vehicleId, driverId) {
     try {
-      const data = errorData || await response.json();
-      if (Array.isArray(data.detail)) {
-        const errorMessages = data.detail.map(err => 
-          `${err.loc.join('.')}: ${err.msg} (${err.type})`
-        ).join('; ');
-        return new Error(errorMessages || `Error ${response.status}: ${response.statusText}`);
+      const url = new URL(buildApiUrl(`${API_CONFIG.ENDPOINTS.VEHICLES}/${vehicleId}/assign-driver`));
+      url.searchParams.append('driver_id', driverId);
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'token': authService.getToken(),
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al asignar conductor');
       }
-      return new Error(data.detail || data.message || `Error ${response.status}: ${response.statusText}`);
-    } catch {
-      return new Error(`Error ${response.status}: ${response.statusText}`);
+
+      return await response.json();
+    } catch (error) {
+      throw new Error(error.message || 'Error de conexión');
     }
   }
 }
 
-export default new VehicleService();
+export default new VehicleService(); 

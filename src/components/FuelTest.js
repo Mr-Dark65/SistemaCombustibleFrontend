@@ -27,15 +27,15 @@ const FuelTest = () => {
     updateState({ loading: true, error: '' });
     try {
       const data = await fuelService.listFuelConsumptions();
-      updateState({ 
+      updateState({
         consumptions: data,
         filteredConsumptions: data,
-        loading: false 
+        loading: false
       });
     } catch (err) {
-      updateState({ 
+      updateState({
         error: err.message || 'Error al cargar consumos',
-        loading: false 
+        loading: false
       });
     }
   };
@@ -57,14 +57,16 @@ const FuelTest = () => {
   const handleCreateConsumption = async (e) => {
     e.preventDefault();
     updateState({ loading: true, error: '' });
-    
+
     try {
+      // Registrar consumo de combustible
       await fuelService.registerFuelConsumption(
         parseInt(newConsumption.routeId),
         parseInt(newConsumption.vehicleId),
         parseFloat(newConsumption.fuelAmount)
       );
       
+      // Recargar los consumos después de registrar
       await loadConsumptions();
       updateState({
         showModal: false,
@@ -75,9 +77,10 @@ const FuelTest = () => {
         }
       });
     } catch (err) {
-      updateState({ 
+      // Manejar error mostrando mensaje más claro
+      updateState({
         error: err.message || 'Error al registrar consumo',
-        loading: false 
+        loading: false
       });
     }
   };
@@ -99,7 +102,7 @@ const FuelTest = () => {
     <div className="fuel-container">
       <div className="fuel-header-container">
         <h1 className="fuel-header">Gestión de Consumo de Combustible</h1>
-        
+
         <div className="fuel-search-container">
           <div className="search-bar">
             <input
@@ -113,7 +116,7 @@ const FuelTest = () => {
               🔍
             </button>
           </div>
-          
+
           <button 
             onClick={() => updateState({ showModal: true })}
             className="fuel-button fuel-button-primary"
@@ -126,7 +129,7 @@ const FuelTest = () => {
 
       {error && (
         <div className="fuel-error">
-          <span>⚠️</span> 
+          <span>⚠️</span>
           <div className="error-message">{error}</div>
         </div>
       )}
@@ -191,7 +194,7 @@ const FuelTest = () => {
                 ×
               </button>
             </div>
-            
+
             <form onSubmit={handleCreateConsumption} className="fuel-form">
               <div className="form-group">
                 <label htmlFor="route-id">ID de Ruta*</label>
@@ -206,7 +209,7 @@ const FuelTest = () => {
                   min="1"
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="vehicle-id">ID de Vehículo*</label>
                 <input
@@ -220,7 +223,7 @@ const FuelTest = () => {
                   min="1"
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="fuel-amount">Cantidad (Litros)*</label>
                 <input
@@ -235,7 +238,7 @@ const FuelTest = () => {
                   min="0.1"
                 />
               </div>
-              
+
               <div className="form-actions">
                 <button 
                   type="button"
