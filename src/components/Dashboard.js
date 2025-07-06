@@ -2,8 +2,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 
-const Dashboard = ({ user, onLogout }) => {
+const Dashboard = ({ user = {}, onLogout }) => {
   const navigate = useNavigate();
+  
+  // Valores por defecto seguros
+  const { nombre = 'Operador', rol = 'Usuario' } = user;
   const maquinas = [
     { id: 'EX-002', tipo: 'Excavadora', consumo: 42, estado: 'activa' },
     { id: 'BL-015', tipo: 'Bulldozer', consumo: 38, estado: 'mantenimiento' },
@@ -20,12 +23,12 @@ const Dashboard = ({ user, onLogout }) => {
           </div>
           <div className="user-menu">
             <div className="user-info">
-              <span className="user-name">{user.nombre}</span>
-              <span className="user-role">{user.rol}</span>
+              <span className="user-name">{nombre}</span>
+              <span className="user-role">{rol}</span>
             </div>
             <button 
               onClick={() => {
-                onLogout();
+                onLogout?.();
                 navigate('/');
               }}
               className="logout-button"
@@ -38,11 +41,7 @@ const Dashboard = ({ user, onLogout }) => {
 
       <main className="dashboard-main">
         <section className="consumo-section">
-          <h2>
-            <i className="icon-fuel"></i>
-            Registro de Consumo
-          </h2>
-          
+          <h2><i className="icon-fuel"></i>Registro de Consumo</h2>
           <div className="maquinas-grid">
             {maquinas.map(maquina => (
               <div key={maquina.id} className={`maquina-card ${maquina.estado}`}>
@@ -66,11 +65,7 @@ const Dashboard = ({ user, onLogout }) => {
         </section>
 
         <section className="analytics-section">
-          <h2>
-            <i className="icon-analytics"></i>
-            Métricas Generales
-          </h2>
-          {/* Gráficos y estadísticas */}
+          <h2><i className="icon-analytics"></i>Métricas Generales</h2>
         </section>
       </main>
     </div>

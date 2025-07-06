@@ -1,241 +1,442 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import vehicleService from '../services/vehicleService';
+import authService from '../services/authService';
 import { VEHICLE_TYPES, VEHICLE_STATUS } from '../config/api';
+import './VehicleTest.css';
 
 const VehicleTest = () => {
-  const [vehicles, setVehicles] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [newVehicle, setNewVehicle] = useState({
-    plate: '',
-    type: '',
-    brand: '',
-    model: '',
-    year: ''
+  const navigate = useNavigate();
+  const [state, setState] = useState({
+    vehicles: [],
+    filteredVehicles: [],
+    loading: false,
+    error: '',
+    showModal: false,
+    searchTerm: '',
+    newVehicle: {
+      id: null,
+      plate: '',
+      type: '',
+      brand: '',
+      model: '',
+      year: '',
+      status: VEHICLE_STATUS.AVAILABLE
+    }
   });
 
-  // Cargar vehículos automáticamente al montar el componente
-  useEffect(() => {
-    console.log('VehicleTest: Componente montado, cargando vehículos...');
-    handleGetVehicles();
-  }, []);
+  const { vehicles, filteredVehicles, loading, error, showModal, searchTerm, newVehicle } = state;
 
-  const handleGetVehicles = async () => {
-    setLoading(true);
-    setError('');
+  const updateState = (updates) => {
+    setState(prev => ({ ...prev, ...updates }));
+  };
+
+  const loadVehicles = async () => {
+    updateState({ loading: true, error: '' });
     try {
-      console.log('VehicleTest: Iniciando petición para obtener vehículos...');
       const data = await vehicleService.listVehicles();
-      console.log('VehicleTest: Respuesta del servicio:', data);
-      setVehicles(Array.isArray(data) ? data : []);
-      console.log('VehicleTest: Vehículos establecidos en estado:', Array.isArray(data) ? data : []);
+      updateState({ 
+        vehicles: data.vehicles || [],
+        filteredVehicles: data.vehicles || [],
+        loading: false 
+      });
     } catch (err) {
-      console.error('VehicleTest: Error al obtener vehículos:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      updateState({ 
+        error: err.message || 'Error al cargar vehículos',
+        loading: false 
+      });
+      console.error('Error al cargar vehículos:', err);
     }
   };
 
-  const handleCreateVehicle = async (e) => {
+  const handleSearch = (term) => {
+    updateState({ searchTerm: term });
+    if (!term) {
+      updateState({ filteredVehicles: vehicles });
+      return;
+    }
+    const filtered = vehicles.filter(vehicle =>
+      vehicle.plate.toLowerCase().includes(term.toLowerCase()) ||
+      vehicle.type.toLowerCase().includes(term.toLowerCase()) ||
+      vehicle.brand.toLowerCase().includes(term.toLowerCase()) ||
+      vehicle.model.toLowerCase().includes(term.toLowerCase()) ||
+      vehicle.year.toString().includes(term) ||
+      vehicle.status.toLowerCase().includes(term.toLowerCase())
+    );
+    updateState({ filteredVehicles: filtered });
+  };
+
+  const handleEditVehicle = (vehicle) => {
+    updateState({
+      showModal: true,
+      newVehicle: {
+        id: vehicle.id,
+        plate: vehicle.plate,
+        type: vehicle.type,
+        brand: vehicle.brand,
+        model: vehicle.model,
+        year: vehicle.year.toString(),
+        status: vehicle.status || VEHICLE_STATUS.AVAILABLE
+      }
+    });
+  };
+
+  const handleSaveVehicle = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    
+
+    // Validación básica
+    if (!newVehicle.plate.trim() || !newVehicle.type || !newVehicle.brand || !newVehicle.model || !newVehicle.year) {
+      updateState({ error: 'Todos los campos son requeridos' });
+      return;
+    }
+
+    updateState({ loading: true, error: '' });
     try {
-      const result = await vehicleService.createVehicle(
-        newVehicle.plate,
-        newVehicle.type,
-        newVehicle.brand,
-        newVehicle.model,
-        parseInt(newVehicle.year)
-      );
-      console.log('Vehículo creado:', result);
-      
-      // Limpiar formulario
-      setNewVehicle({
-        plate: '',
-        type: '',
-        brand: '',
-        model: '',
-        year: ''
+      const vehicleData = {
+        plate: newVehicle.plate.trim(),
+        type: newVehicle.type,
+        brand: newVehicle.brand,
+        model: newVehicle.model,
+        year: parseInt(newVehicle.year)
+      };
+
+      let result;
+      if (newVehicle.id) {
+        await vehicleService.updateVehicleStatus(newVehicle.id, newVehicle.status);
+        updateState({ error: '' });
+      } else {
+        result = await vehicleService.createVehicle(
+          vehicleData.plate,
+          vehicleData.type,
+          vehicleData.brand,
+          vehicleData.model,
+          vehicleData.year
+        );
+      }
+
+      if (!result?.id && !newVehicle.id) {
+        throw new Error('No se recibió respuesta válida del servidor');
+      }
+
+      await loadVehicles();
+      updateState({
+        showModal: false,
+        newVehicle: {
+          id: null,
+          plate: '',
+          type: '',
+          brand: '',
+          model: '',
+          year: '',
+          status: VEHICLE_STATUS.AVAILABLE
+        }
       });
-      
-      // Actualizar lista
-      handleGetVehicles();
     } catch (err) {
-      setError(err.message);
-      console.error('Error al crear vehículo:', err);
-    } finally {
-      setLoading(false);
+      let errorMessage = err.message;
+      if (err.message.includes('422')) {
+        errorMessage = 'Error de validación: ' + err.message.replace(/.*Error 422: /, '');
+      }
+      updateState({ 
+        error: errorMessage,
+        loading: false 
+      });
+      console.error('Error al guardar vehículo:', err);
     }
   };
 
   const handleInputChange = (e) => {
-    setNewVehicle({
-      ...newVehicle,
-      [e.target.name]: e.target.value
+    const { name, value, type } = e.target;
+    updateState({
+      newVehicle: {
+        ...newVehicle,
+        [name]: type === 'number' ? value : value
+      }
     });
   };
 
+  const handleStatusChange = (e) => {
+    updateState({
+      newVehicle: {
+        ...newVehicle,
+        status: e.target.value
+      }
+    });
+  };
+
+  const handleLoginRedirect = () => {
+    navigate('/login');
+  };
+
+  useEffect(() => {
+    if (!authService.isAuthenticated()) {
+      navigate('/login');
+      return;
+    }
+    loadVehicles();
+  }, [navigate]);
+
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-      <h2>Prueba de API de Vehículos</h2>
-      
-      {/* Obtener Vehículos */}
-      <div style={{ marginBottom: '20px' }}>
-        <h3>Obtener Vehículos</h3>
-        <button 
-          onClick={handleGetVehicles} 
-          disabled={loading}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          {loading ? 'Cargando...' : 'Obtener Vehículos'}
-        </button>
-      </div>
-
-      {/* Crear Vehículo */}
-      <div style={{ marginBottom: '20px' }}>
-        <h3>Crear Nuevo Vehículo</h3>
-        <form onSubmit={handleCreateVehicle}>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Placa: </label>
+    <div className="driver-container">
+      <div className="driver-header-container">
+        <h1 className="driver-header">Gestión de Vehículos</h1>
+        
+        <div className="driver-search-container">
+          <div className="search-bar">
             <input
               type="text"
-              name="plate"
-              value={newVehicle.plate}
-              onChange={handleInputChange}
-              placeholder="ABC123"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
+              placeholder="Buscar vehículos..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              disabled={loading}
             />
+            <button className="search-button" disabled={loading}>
+              🔍
+            </button>
           </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Tipo: </label>
-            <select
-              name="type"
-              value={newVehicle.type}
-              onChange={handleInputChange}
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
-            >
-              <option value="">Seleccionar tipo</option>
-              <option value={VEHICLE_TYPES.TRUCK}>{VEHICLE_TYPES.TRUCK}</option>
-              <option value={VEHICLE_TYPES.CAR}>{VEHICLE_TYPES.CAR}</option>
-              <option value={VEHICLE_TYPES.VAN}>{VEHICLE_TYPES.VAN}</option>
-              <option value={VEHICLE_TYPES.BUS}>{VEHICLE_TYPES.BUS}</option>
-              <option value={VEHICLE_TYPES.TRACTOR}>{VEHICLE_TYPES.TRACTOR}</option>
-            </select>
-          </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Marca: </label>
-            <input
-              type="text"
-              name="brand"
-              value={newVehicle.brand}
-              onChange={handleInputChange}
-              placeholder="Volvo"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
-            />
-          </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Modelo: </label>
-            <input
-              type="text"
-              name="model"
-              value={newVehicle.model}
-              onChange={handleInputChange}
-              placeholder="FH"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
-            />
-          </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Año: </label>
-            <input
-              type="number"
-              name="year"
-              value={newVehicle.year}
-              onChange={handleInputChange}
-              placeholder="2022"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
-            />
-          </div>
+          
           <button 
-            type="submit" 
+            onClick={() => updateState({ 
+              showModal: true,
+              newVehicle: {
+                id: null,
+                plate: '',
+                type: '',
+                brand: '',
+                model: '',
+                year: '',
+                status: VEHICLE_STATUS.AVAILABLE
+              }
+            })}
+            className="driver-button driver-button-primary"
             disabled={loading}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
           >
-            {loading ? 'Creando...' : 'Crear Vehículo'}
+            Añadir Vehículo
           </button>
-        </form>
+        </div>
       </div>
 
-      {/* Mostrar Error */}
       {error && (
-        <div style={{ 
-          padding: '10px', 
-          backgroundColor: '#f8d7da', 
-          color: '#721c24', 
-          borderRadius: '4px',
-          marginBottom: '20px'
-        }}>
-          {error}
+        <div className="driver-error">
+          <span>⚠️</span> 
+          <div className="error-message">{error}</div>
+          {error.includes('Sesión expirada') && (
+            <button onClick={handleLoginRedirect} className="button secondary">
+              Ir a Iniciar Sesión
+            </button>
+          )}
         </div>
       )}
 
-      {/* Lista de Vehículos */}
-      <div>
-        <h3>Vehículos ({vehicles.length})</h3>
-        {loading ? (
-          <p>Cargando vehículos...</p>
-        ) : vehicles.length === 0 ? (
-          <div>
-            <p>No hay vehículos para mostrar</p>
-            <p style={{ fontSize: '0.9rem', color: '#666' }}>
-              Haz clic en "Obtener Vehículos" para cargar la lista o crea un nuevo vehículo.
-            </p>
+      <div className="driver-content">
+        {loading && filteredVehicles.length === 0 ? (
+          <div className="driver-loading">
+            <div className="spinner"></div>
+            <p>Cargando vehículos...</p>
           </div>
         ) : (
-          <div>
-            {vehicles.map((vehicle, index) => (
-              <div 
-                key={index} 
-                style={{ 
-                  border: '1px solid #ddd', 
-                  padding: '10px', 
-                  marginBottom: '10px',
-                  borderRadius: '4px'
-                }}
-              >
-                <strong>Placa:</strong> {vehicle.plate}<br/>
-                <strong>Tipo:</strong> {vehicle.type}<br/>
-                <strong>Marca:</strong> {vehicle.brand}<br/>
-                <strong>Modelo:</strong> {vehicle.model}<br/>
-                <strong>Año:</strong> {vehicle.year}
-              </div>
-            ))}
+          <div className="driver-table-wrapper">
+            <table className="driver-table">
+              <thead>
+                <tr>
+                  <th>Placa</th>
+                  <th>Tipo</th>
+                  <th>Marca</th>
+                  <th>Modelo</th>
+                  <th>Año</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredVehicles.length > 0 ? (
+                  filteredVehicles.map((vehicle) => (
+                    <tr key={vehicle.id}>
+                      <td>{vehicle.plate}</td>
+                      <td>{vehicle.type}</td>
+                      <td>{vehicle.brand}</td>
+                      <td>{vehicle.model}</td>
+                      <td>{vehicle.year}</td>
+                      <td>
+                        <span className={`driver-status ${vehicle.status.toLowerCase().includes('disponible') ? 'available' : 'unavailable'}`}>
+                          {vehicle.status}
+                        </span>
+                      </td>
+                      <td className="actions-cell">
+                        <button 
+                          className="driver-action-button edit"
+                          onClick={() => handleEditVehicle(vehicle)}
+                          disabled={loading}
+                          title="Editar vehículo"
+                        >
+                         
+                          <span className="text">Editar</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="driver-table-empty">
+                      {searchTerm ? 'No se encontraron resultados' : 'No hay vehículos registrados'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
+
+      {showModal && (
+        <div className="driver-modal-overlay">
+          <div className="driver-modal">
+            <div className="driver-modal-header">
+              <h2>{newVehicle.id ? 'Editar Vehículo' : 'Registrar Nuevo Vehículo'}</h2>
+              <button 
+                onClick={() => updateState({ 
+                  showModal: false,
+                  newVehicle: {
+                    id: null,
+                    plate: '',
+                    type: '',
+                    brand: '',
+                    model: '',
+                    year: '',
+                    status: VEHICLE_STATUS.AVAILABLE
+                  }
+                })}
+                className="driver-modal-close"
+                disabled={loading}
+              >
+                ×
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveVehicle} className="driver-form">
+              <div className="form-group">
+                <label htmlFor="vehicle-plate">Placa*</label>
+                <input
+                  id="vehicle-plate"
+                  type="text"
+                  name="plate"
+                  value={newVehicle.plate}
+                  onChange={handleInputChange}
+                  required
+                  pattern="[A-Za-z]{3}\d{3,4}"
+                  title="Formato: ABC123 o ABC1234"
+                  disabled={newVehicle.id}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="vehicle-type">Tipo*</label>
+                <select
+                  id="vehicle-type"
+                  name="type"
+                  value={newVehicle.type}
+                  onChange={handleInputChange}
+                  required
+                  disabled={newVehicle.id}
+                >
+                  <option value="">Seleccione tipo</option>
+                  <option value={VEHICLE_TYPES.LIGHT}>{VEHICLE_TYPES.LIGHT}</option>
+                  <option value={VEHICLE_TYPES.HEAVY}>{VEHICLE_TYPES.HEAVY}</option>
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="vehicle-brand">Marca*</label>
+                <input
+                  id="vehicle-brand"
+                  type="text"
+                  name="brand"
+                  value={newVehicle.brand}
+                  onChange={handleInputChange}
+                  required
+                  disabled={newVehicle.id}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="vehicle-model">Modelo*</label>
+                <input
+                  id="vehicle-model"
+                  type="text"
+                  name="model"
+                  value={newVehicle.model}
+                  onChange={handleInputChange}
+                  required
+                  disabled={newVehicle.id}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="vehicle-year">Año*</label>
+                <input
+                  id="vehicle-year"
+                  type="number"
+                  name="year"
+                  value={newVehicle.year}
+                  onChange={handleInputChange}
+                  min="2000"
+                  max={new Date().getFullYear() + 1}
+                  required
+                  disabled={newVehicle.id}
+                />
+              </div>
+              
+              {newVehicle.id && (
+                <div className="form-group">
+                  <label htmlFor="vehicle-status">Estado*</label>
+                  <select
+                    id="vehicle-status"
+                    name="status"
+                    value={newVehicle.status}
+                    onChange={handleStatusChange}
+                    required
+                  >
+                    <option value="">Seleccione estado</option>
+                    {Object.values(VEHICLE_STATUS).map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              <div className="form-actions">
+                <button 
+                  type="button"
+                  onClick={() => updateState({ 
+                    showModal: false,
+                    newVehicle: {
+                      id: null,
+                      plate: '',
+                      type: '',
+                      brand: '',
+                      model: '',
+                      year: '',
+                      status: VEHICLE_STATUS.AVAILABLE
+                    }
+                  })}
+                  className="button secondary"
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="button primary"
+                  disabled={loading}
+                >
+                  {loading ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default VehicleTest; 
+export default VehicleTest;

@@ -2,64 +2,17 @@ import { buildApiUrl, API_CONFIG } from '../config/api';
 import authService from './authService';
 
 class DriverService {
-  // Registrar un nuevo conductor
-  async registerDriver(name, licenseType, availability) {
+  normalizeDriver(driver) {
+    return {
+      ...driver,
+      licenseType: driver.license_type,
+      createdAt: driver.created_at
+    };
+  }
+
+  async listDrivers() {
     try {
       const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.DRIVERS), {
-        method: 'POST',
-        headers: {
-          'token': authService.getToken(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name,
-          license_type: licenseType,
-          availability
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error al registrar conductor');
-      }
-
-      return await response.json();
-    } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
-    }
-  }
-
-  // Obtener un conductor específico
-  async getDriver(driverId) {
-    try {
-      const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.DRIVERS}/${driverId}`), {
-        method: 'GET',
-        headers: {
-          'token': authService.getToken(),
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error al obtener conductor');
-      }
-
-      return await response.json();
-    } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
-    }
-  }
-
-  // Listar conductores con filtros opcionales
-  async listDrivers(availability = null, licenseType = null) {
-    try {
-      const url = new URL(buildApiUrl(API_CONFIG.ENDPOINTS.DRIVERS));
-      if (availability !== null) url.searchParams.append('availability', availability);
-      if (licenseType !== null) url.searchParams.append('license_type', licenseType);
-
-      const response = await fetch(url, {
-        method: 'GET',
         headers: {
           'token': authService.getToken(),
           'Content-Type': 'application/json'
@@ -71,64 +24,107 @@ class DriverService {
         throw new Error(errorData.detail || 'Error al listar conductores');
       }
 
-      return await response.json();
+      const data = await response.json();
+      return Array.isArray(data.drivers) ? data.drivers.map(this.normalizeDriver) : [];
     } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
+      console.error('Error en listDrivers:', error);
+      throw error;
     }
   }
 
-  // Actualizar datos de un conductor
-  async updateDriver(driverId, name, licenseType, availability) {
+  async registerDriver(driverData) {
     try {
-      const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.DRIVERS}/${driverId}`), {
-        method: 'PUT',
-        headers: {
-          'token': authService.getToken(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name,
-          license_type: licenseType,
-          availability
-        })
-      });
+      const payload = {
+        name: driverData.name,
+        license_type: Number(driverData.licenseType),
+        availability: Boolean(driverData.availability)
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error al actualizar conductor');
-      }
-
-      return await response.json();
-    } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
-    }
-  }
-
-  // Asignar conductor a ruta y vehículo
-  async assignDriver(driverId, routeId, vehicleId) {
-    try {
-      const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.DRIVERS}/${driverId}/assign`), {
+      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.DRIVERS), {
         method: 'POST',
         headers: {
           'token': authService.getToken(),
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          route_id: routeId,
-          vehicle_id: vehicleId
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error al asignar conductor');
+        let errorMessage = errorData.detail || 'Error al registrar conductor';
+        if (errorData.errors) {
+          errorMessage = Object.values(errorData.errors).join(', ');
+        }
+        throw new Error(errorMessage);
       }
 
-      return await response.json();
+      return this.normalizeDriver(await response.json());
     } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
+      console.error('Error en registerDriver:', error);
+      throw error;
+    }
+  }
+
+  async updateDriver(driverId, driverData) {
+    try {
+      const payload = {
+        name: driverData.name,
+        license_type: Number(driverData.licenseType),
+        availability: Boolean(driverData.availability)
+      };
+
+      const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.DRIVERS)}/${driverId}`, {
+        method: 'PUT',
+        headers: {
+          'token': authService.getToken(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        let errorMessage = `Error ${response.status}: ${response.statusText}`;
+        if (errorData.detail) errorMessage = errorData.detail;
+        if (errorData.errors) {
+          errorMessage = Object.entries(errorData.errors)
+            .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
+            .join('; ');
+        }
+        throw new Error(errorMessage);
+      }
+
+      return this.normalizeDriver(await response.json());
+    } catch (error) {
+      console.error('Error en updateDriver:', error);
+      throw error;
+    }
+  }
+
+  async deleteDriver(driverId) {
+    try {
+      const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.DRIVERS)}/${driverId}`, {
+        method: 'DELETE',
+        headers: {
+          'token': authService.getToken(),
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        let errorMessage = errorData.detail || 'Error al eliminar conductor';
+        if (errorData.message) errorMessage = errorData.message;
+        throw new Error(errorMessage);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error en deleteDriver:', error);
+      throw error;
     }
   }
 }
 
-export default new DriverService(); 
+const driverServiceInstance = new DriverService();
+export default driverServiceInstance;
