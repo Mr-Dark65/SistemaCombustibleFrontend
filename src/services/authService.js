@@ -45,23 +45,26 @@ class AuthService {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Error en login:', errorData); // Depuración
         throw new Error(errorData.detail || 'Error en el login');
       }
 
       const data = await response.json();
+      console.log('Login exitoso, datos:', data); // Depuración
       this._handleTokenResponse(data);
       return data;
     } catch (error) {
-      console.error('Error en login:', error);
+      console.error('Error en login:', error); 
       throw new Error(error.message || 'Error de conexión');
     }
   }
 
-  // Manejar respuesta del token
+  // Manejar la respuesta del token
   _handleTokenResponse(data) {
     if (!data.token) {
       throw new Error('No se recibió token en la respuesta');
     }
+    console.log('Token recibido:', data.token); // Depuración
     localStorage.setItem('authToken', data.token);
     if (data.role) localStorage.setItem('userRole', data.role);
     if (data.user_id) localStorage.setItem('userId', data.user_id);
@@ -76,38 +79,26 @@ class AuthService {
 
   // Obtener token
   getToken() {
-    return localStorage.getItem('authToken');
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      console.error("Token no encontrado en localStorage");
+      return null;
+    }
+    return token;
   }
 
   // Verificar autenticación
   isAuthenticated() {
-    return !!this.getToken();
-  }
-
-  // Obtener rol del usuario
-  getUserRole() {
-    return localStorage.getItem('userRole');
-  }
-
-  // Validar token
-  async validateToken() {
-    try {
-      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.VALIDATE_TOKEN), {
-        method: 'POST',
-        headers: {
-          'token': this.getToken()
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Token inválido');
-      }
-
-      return await response.json();
-    } catch (error) {
-      this.logout();
-      throw error;
+    const token = this.getToken();
+    if (!token) {
+      return false;
     }
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      console.error("Token inválido, formato incorrecto");
+      return false;
+    }
+    return true;
   }
 }
 
