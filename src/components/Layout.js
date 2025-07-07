@@ -44,7 +44,7 @@ const Layout = ({ user, onLogout }) => {
             <li>
               <Link to="/choferes">
                 <i className="icon">👨‍✈️</i>
-                {menuOpen && <span>Servicio de Choferes</span>}
+                {menuOpen && <span>Servicio de Conductores</span>}
               </Link>
             </li>
             <li>
@@ -65,12 +65,7 @@ const Layout = ({ user, onLogout }) => {
                 {menuOpen && <span>Consumo de Combustible</span>}
               </Link>
             </li>
-            <li>
-              <Link to="/seguridad">
-                <i className="icon">🔒</i>
-                {menuOpen && <span>Autenticación</span>}
-              </Link>
-            </li>
+            
           </ul>
         </nav>
 

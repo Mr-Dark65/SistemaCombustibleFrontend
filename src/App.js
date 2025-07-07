@@ -12,6 +12,26 @@ import FuelTest from './components/FuelTest';
 import authService from './services/authService';
 import './App.css';
 
+// Función para extraer username del token JWT (sin depender del backend)
+const extractUserFromToken = (token) => {
+  if (!token) return null;
+  
+  try {
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(atob(payload));
+    return {
+      username: decoded.username || decoded.sub || 'Usuario',
+      role: decoded.role || 'operador'
+    };
+  } catch (error) {
+    console.warn('Error decoding token:', error);
+    return {
+      username: 'Operador',
+      role: 'operador'
+    };
+  }
+};
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,10 +39,11 @@ function App() {
   useEffect(() => {
     const token = authService.getToken();
     if (token) {
-      const role = localStorage.getItem('userRole') || 'usuario';
+      const userData = extractUserFromToken(token);
       setUser({
         token,
-        rol: role,
+        nombre: userData.username,
+        rol: localStorage.getItem('userRole') || userData.role
       });
     }
     setLoading(false);
@@ -34,7 +55,7 @@ function App() {
   };
 
   if (loading) {
-    return <div>Cargando...</div>;
+    return <div className="loading-screen">Cargando...</div>;
   }
 
   return (
@@ -46,17 +67,17 @@ function App() {
           element={
             user ? 
               <Navigate to="/" /> : 
-              <Login onLogin={(userData) => setUser(userData)} />
+              <Login onLogin={(token) => {
+                const userData = extractUserFromToken(token);
+                setUser({
+                  token,
+                  nombre: userData.username,
+                  rol: localStorage.getItem('userRole') || userData.role
+                });
+              }} />
           } 
         />
-        <Route 
-          path="/register" 
-          element={
-            user ? 
-              <Navigate to="/" /> : 
-              <Register />
-          } 
-        />
+        <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
         <Route 
           path="/" 
           element={
@@ -67,12 +88,11 @@ function App() {
               <Navigate to="/login" />
           } 
         >
-          <Route index element={<Dashboard />} />
+          <Route index element={<Dashboard user={user} />} />
           <Route path="choferes" element={<DriverTest />} />
           <Route path="vehiculos" element={<VehicleTest />} />
           <Route path="rutas" element={<RouteTest />} />
           <Route path="combustible" element={<FuelTest />} />
-          <Route path="seguridad" element={<div>Autenticación</div>} />
         </Route>
       </Routes>
     </>

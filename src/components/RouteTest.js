@@ -1,189 +1,305 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import routeService from '../services/routeService';
+import './RouteTest.css';
 
 const RouteTest = () => {
-  const [routes, setRoutes] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [newRoute, setNewRoute] = useState({
-    origin: '',
-    destination: '',
-    distance: ''
+  const [state, setState] = useState({
+    routes: [],
+    filteredRoutes: [],
+    loading: false,
+    error: '',
+    searchTerm: '',
+    newRoute: {
+      origin: '',
+      destination: '',
+      distance: ''
+    },
+    showModal: false,
+    editRoute: null
   });
 
-  const handleGetRoutes = async () => {
-    setLoading(true);
-    setError('');
+  const { routes, filteredRoutes, loading, error, searchTerm, newRoute, showModal, editRoute } = state;
+
+  const updateState = (updates) => {
+    setState(prev => ({ ...prev, ...updates }));
+  };
+
+  // Cargar las rutas
+  const loadRoutes = async () => {
+    updateState({ loading: true, error: '' });
     try {
       const data = await routeService.listRoutes();
-      setRoutes(data);
-      console.log('Rutas obtenidas:', data);
+      console.log('Rutas cargadas:', data); // Depuración
+      const routes = data.routes || [];  // Asegurarse de que 'routes' existe y es un array
+      updateState({ routes: routes, filteredRoutes: routes, loading: false });
     } catch (err) {
-      setError(err.message);
-      console.error('Error al obtener rutas:', err);
-    } finally {
-      setLoading(false);
+      console.error('Error al cargar rutas:', err); // Depuración
+      updateState({ error: err.message || 'Error al cargar rutas', loading: false });
     }
+  };
+
+  const handleSearch = (term) => {
+    updateState({ searchTerm: term });
+    if (!term) {
+      updateState({ filteredRoutes: routes });
+      return;
+    }
+    const filtered = routes.filter((route) =>
+      route.origin.toLowerCase().includes(term.toLowerCase()) ||
+      route.destination.toLowerCase().includes(term.toLowerCase()) ||
+      route.distance.toString().includes(term)
+    );
+    updateState({ filteredRoutes: filtered });
   };
 
   const handleCreateRoute = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    
+    updateState({ loading: true, error: '' });
+
     try {
       const result = await routeService.createRoute(
         newRoute.origin,
         newRoute.destination,
         parseFloat(newRoute.distance)
       );
-      console.log('Ruta creada:', result);
-      
-      // Limpiar formulario
-      setNewRoute({
-        origin: '',
-        destination: '',
-        distance: ''
+
+      const updatedRoutes = await routeService.listRoutes();
+      updateState({
+        routes: updatedRoutes,
+        filteredRoutes: updatedRoutes,
+        newRoute: { origin: '', destination: '', distance: '' },
+        showModal: false,
+        loading: false
       });
-      
-      // Actualizar lista
-      handleGetRoutes();
     } catch (err) {
-      setError(err.message);
-      console.error('Error al crear ruta:', err);
-    } finally {
-      setLoading(false);
+      updateState({ error: err.message || 'Error al crear ruta', loading: false });
+    }
+  };
+
+  const handleEditRoute = async (route) => {
+    updateState({
+      editRoute: route,
+      newRoute: { origin: route.origin, destination: route.destination, distance: route.distance },
+      showModal: true
+    });
+  };
+
+  const handleUpdateRoute = async (e) => {
+    e.preventDefault();
+    updateState({ loading: true, error: '' });
+
+    try {
+      const updatedRoute = await routeService.updateRoute(
+        editRoute.id,
+        newRoute.origin,
+        newRoute.destination,
+        parseFloat(newRoute.distance)
+      );
+
+      // Actualizar la ruta en el estado sin necesidad de recargar todas las rutas
+      const updatedRoutes = routes.map((route) => 
+        route.id === editRoute.id ? { ...route, ...updatedRoute } : route
+      );
+
+      updateState({
+        routes: updatedRoutes,
+        filteredRoutes: updatedRoutes,
+        newRoute: { origin: '', destination: '', distance: '' },
+        showModal: false,
+        loading: false,
+        editRoute: null
+      });
+    } catch (err) {
+      updateState({ error: err.message || 'Error al actualizar ruta', loading: false });
+    }
+  };
+
+  const handleDeleteRoute = async (routeId) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar esta ruta?')) {
+      updateState({ loading: true, error: '' });
+      try {
+        await routeService.deleteRoute(routeId);
+        
+        // Eliminar la ruta del estado local sin necesidad de recargar desde el backend
+        const updatedRoutes = routes.filter((route) => route.id !== routeId);
+        updateState({
+          routes: updatedRoutes,
+          filteredRoutes: updatedRoutes,
+          loading: false
+        });
+      } catch (err) {
+        updateState({ error: err.message || 'Error al eliminar ruta', loading: false });
+      }
     }
   };
 
   const handleInputChange = (e) => {
-    setNewRoute({
-      ...newRoute,
-      [e.target.name]: e.target.value
+    updateState({
+      newRoute: {
+        ...newRoute,
+        [e.target.name]: e.target.value
+      }
     });
   };
 
+  useEffect(() => {
+    loadRoutes();
+  }, []);
+
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-      <h2>Prueba de API de Rutas</h2>
-      
-      {/* Obtener Rutas */}
-      <div style={{ marginBottom: '20px' }}>
-        <h3>Obtener Rutas</h3>
-        <button 
-          onClick={handleGetRoutes} 
-          disabled={loading}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          {loading ? 'Cargando...' : 'Obtener Rutas'}
-        </button>
-      </div>
-
-      {/* Crear Ruta */}
-      <div style={{ marginBottom: '20px' }}>
-        <h3>Crear Nueva Ruta</h3>
-        <form onSubmit={handleCreateRoute}>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Origen: </label>
+    <div className="driver-container">
+      <div className="driver-header-container">
+        <h1 className="driver-header">Gestión de Rutas</h1>
+        <div className="driver-search-container">
+          <div className="search-bar">
             <input
               type="text"
-              name="origin"
-              value={newRoute.origin}
-              onChange={handleInputChange}
-              placeholder="Quito"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
+              placeholder="Buscar rutas..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              disabled={loading}
             />
+            <button className="search-button" disabled={loading}>🔍</button>
           </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Destino: </label>
-            <input
-              type="text"
-              name="destination"
-              value={newRoute.destination}
-              onChange={handleInputChange}
-              placeholder="Guayaquil"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
-            />
-          </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Distancia (km): </label>
-            <input
-              type="number"
-              name="distance"
-              value={newRoute.distance}
-              onChange={handleInputChange}
-              placeholder="420"
-              step="0.1"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
-            />
-          </div>
-          <button 
-            type="submit" 
+          <button
+            onClick={() => updateState({ showModal: true })}
+            className="driver-button driver-button-primary"
             disabled={loading}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
           >
-            {loading ? 'Creando...' : 'Crear Ruta'}
+            Añadir Ruta
           </button>
-        </form>
+        </div>
       </div>
 
-      {/* Mostrar Error */}
       {error && (
-        <div style={{ 
-          padding: '10px', 
-          backgroundColor: '#f8d7da', 
-          color: '#721c24', 
-          borderRadius: '4px',
-          marginBottom: '20px'
-        }}>
-          {error}
+        <div className="driver-error">
+          <span>⚠️</span>
+          <div className="error-message">{error}</div>
         </div>
       )}
 
-      {/* Lista de Rutas */}
-      <div>
-        <h3>Rutas ({routes.length})</h3>
-        {routes.length === 0 ? (
-          <p>No hay rutas para mostrar</p>
+      <div className="driver-content">
+        {loading && filteredRoutes.length === 0 ? (
+          <div className="driver-loading">
+            <div className="spinner"></div>
+            <p>Cargando rutas...</p>
+          </div>
         ) : (
-          <div>
-            {routes.map((route, index) => (
-              <div 
-                key={index} 
-                style={{ 
-                  border: '1px solid #ddd', 
-                  padding: '10px', 
-                  marginBottom: '10px',
-                  borderRadius: '4px'
-                }}
-              >
-                <strong>Origen:</strong> {route.origin}<br/>
-                <strong>Destino:</strong> {route.destination}<br/>
-                <strong>Distancia:</strong> {route.distance} km
-              </div>
-            ))}
+          <div className="driver-table-wrapper">
+            <table className="driver-table">
+              <thead>
+                <tr>
+                  <th>Origen</th>
+                  <th>Destino</th>
+                  <th>Distancia (km)</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRoutes.length > 0 ? (
+                  filteredRoutes.map((route, index) => (
+                    <tr key={index}>
+                      <td>{route.origin}</td>
+                      <td>{route.destination}</td>
+                      <td>{route.distance}</td>
+                      <td className="actions-cell">
+                        <button 
+                          className="driver-action-button edit"
+                          onClick={() => handleEditRoute(route)}
+                          disabled={loading}
+                        >
+                          <span className="text">Editar</span>
+                        </button>
+                        <button 
+                          className="driver-action-button delete"
+                          onClick={() => handleDeleteRoute(route.id)}
+                          disabled={loading}
+                        >
+                          <span className="text">Eliminar</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="driver-table-empty">
+                      {searchTerm ? 'No se encontraron resultados' : 'No hay rutas registradas'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
+
+      {showModal && (
+        <div className="driver-modal-overlay">
+          <div className="driver-modal">
+            <div className="driver-modal-header">
+              <h2>{editRoute ? 'Editar Ruta' : 'Registrar Nueva Ruta'}</h2>
+              <button
+                onClick={() => updateState({ showModal: false, editRoute: null })}
+                className="driver-modal-close"
+                disabled={loading}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={editRoute ? handleUpdateRoute : handleCreateRoute} className="driver-form">
+              <div className="form-group">
+                <label htmlFor="route-origin">Origen*</label>
+                <input
+                  id="route-origin"
+                  type="text"
+                  name="origin"
+                  value={newRoute.origin}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Quito"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="route-destination">Destino*</label>
+                <input
+                  id="route-destination"
+                  type="text"
+                  name="destination"
+                  value={newRoute.destination}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Guayaquil"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="route-distance">Distancia (km)*</label>
+                <input
+                  id="route-distance"
+                  type="number"
+                  name="distance"
+                  value={newRoute.distance}
+                  onChange={handleInputChange}
+                  step="0.1"
+                  required
+                  placeholder="420"
+                />
+              </div>
+
+              <div className="form-actions">
+                <button type="button" onClick={() => updateState({ showModal: false, editRoute: null })} className="button secondary" disabled={loading}>Cancelar</button>
+                <button type="submit" className="button primary" disabled={loading}>
+                  {loading ? 'Guardando...' : editRoute ? 'Actualizar' : 'Crear'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default RouteTest; 
+export default RouteTest;

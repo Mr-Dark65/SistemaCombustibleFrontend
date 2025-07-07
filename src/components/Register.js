@@ -146,10 +146,10 @@ const Register = () => {
               onChange={handleChange}
               required
             >
-              <option value="usuario">Usuario</option>
-              <option value="operador">Operador</option>
-              <option value="supervisor">Supervisor</option>
-              <option value="admin">Administrador</option>
+             
+              <option value="Operador">Operador</option>
+              <option value="Supervisor">Supervisor</option>
+              <option value="Admin">Admin</option>
             </select>
           </div>
 

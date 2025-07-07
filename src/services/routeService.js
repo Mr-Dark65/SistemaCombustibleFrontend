@@ -4,11 +4,17 @@ import authService from './authService';
 class RouteService {
   // Crear una nueva ruta
   async createRoute(origin, destination, distance) {
+    const token = authService.getToken();  // Obtener el token
+
+    if (!token) {
+      throw new Error('No se encontró un token válido');
+    }
+
     try {
       const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.ROUTES), {
         method: 'POST',
         headers: {
-          'token': authService.getToken(),
+          'token': token,  // Enviar el token en las cabeceras
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -31,11 +37,17 @@ class RouteService {
 
   // Listar todas las rutas
   async listRoutes() {
+    const token = authService.getToken();  // Obtener el token
+
+    if (!token) {
+      throw new Error('No se encontró un token válido');
+    }
+
     try {
       const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.ROUTES), {
         method: 'GET',
         headers: {
-          'token': authService.getToken(),
+          'token': token,  // Enviar el token en las cabeceras
           'Content-Type': 'application/json'
         }
       });
@@ -53,11 +65,17 @@ class RouteService {
 
   // Obtener una ruta específica
   async getRoute(routeId) {
+    const token = authService.getToken();  // Obtener el token
+
+    if (!token) {
+      throw new Error('No se encontró un token válido');
+    }
+
     try {
       const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.ROUTES}/${routeId}`), {
         method: 'GET',
         headers: {
-          'token': authService.getToken(),
+          'token': token,  // Enviar el token en las cabeceras
           'Content-Type': 'application/json'
         }
       });
@@ -75,11 +93,17 @@ class RouteService {
 
   // Actualizar una ruta
   async updateRoute(routeId, origin, destination, distance) {
+    const token = authService.getToken();  // Obtener el token
+
+    if (!token) {
+      throw new Error('No se encontró un token válido');
+    }
+
     try {
       const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.ROUTES}/${routeId}`), {
         method: 'PUT',
         headers: {
-          'token': authService.getToken(),
+          'token': token,  // Enviar el token en las cabeceras
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -100,45 +124,26 @@ class RouteService {
     }
   }
 
-  // Asignar vehículo a una ruta
-  async assignVehicleToRoute(routeId, vehicleId) {
-    try {
-      const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.ROUTES}/${routeId}/assign-vehicle`), {
-        method: 'PUT',
-        headers: {
-          'token': authService.getToken(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          vehicle_id: vehicleId
-        })
-      });
+  // Eliminar una ruta
+  async deleteRoute(routeId) {
+    const token = authService.getToken();  // Obtener el token
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error al asignar vehículo a ruta');
-      }
-
-      return await response.json();
-    } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
+    if (!token) {
+      throw new Error('No se encontró un token válido');
     }
-  }
 
-  // Calcular consumo de combustible para una ruta
-  async calculateFuelConsumption(routeId) {
     try {
-      const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.ROUTES}/${routeId}/fuel-consumption`), {
-        method: 'GET',
+      const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.ROUTES}/${routeId}`), {
+        method: 'DELETE',
         headers: {
-          'token': authService.getToken(),
+          'token': token,  // Enviar el token en las cabeceras
           'Content-Type': 'application/json'
         }
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error al calcular consumo de combustible');
+        throw new Error(errorData.detail || 'Error al eliminar ruta');
       }
 
       return await response.json();
@@ -148,4 +153,4 @@ class RouteService {
   }
 }
 
-export default new RouteService(); 
+export default new RouteService();

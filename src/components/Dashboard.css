@@ -1,13 +1,17 @@
+/* Contenedor principal del Dashboard */
 .dashboard-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background-color: #f5f7fa;
+  font-family: 'Roboto', sans-serif;
+  color: #333;
 }
 
+/* Estilos del header */
 .dashboard-header {
-  background: white;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   padding: 20px 0;
 }
 
@@ -26,66 +30,193 @@
   gap: 20px;
 }
 
-.welcome-message {
-  font-weight: 500;
-  color: #555;
+.user-info {
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .logout-button {
-  background: none;
-  border: 1px solid #ddd;
-  padding: 8px 15px;
-  border-radius: 6px;
+  background: #007bff;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 5px;
+  color: white;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.3s, transform 0.2s;
 }
 
 .logout-button:hover {
-  background: #f8f9fa;
-  border-color: #ccc;
+  background-color: #0056b3;
+  transform: scale(1.05);
 }
 
+/* Main section que contiene el contenido */
 .dashboard-main {
   flex: 1;
   padding: 30px 20px;
   max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
+  margin: 20px auto;
+}
+
+/* Grid para las tarjetas de las máquinas */
+.maquinas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.maquina-card {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.3s;
+}
+
+.maquina-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Colores y estilos para el estado de las máquinas */
+.maquina-card.active {
+  border-left: 4px solid #28a745;
+  background-color: #eafaf1;
+}
+
+.maquina-card.maintenance {
+  border-left: 4px solid #ffc107;
+  background-color: #fff8e1;
+}
+
+.maquina-card .consumo-info {
+  margin-top: 20px;
+}
+
+.consumo-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2b2d42;
+}
+
+.consumo-actions button {
+  margin-right: 10px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+.consumo-actions .btn-registrar {
+  background-color: #007bff;
+  color: white;
+  border: none;
+}
+
+.consumo-actions .btn-detalles {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+}
+
+.consumo-actions button:hover {
+  transform: scale(1.05);
+}
+
+.consumo-actions .btn-registrar:hover {
+  background-color: #0056b3;
+}
+
+.consumo-actions .btn-detalles:hover {
+  background-color: #5a6268;
+}
+
+.maquina-status {
+  margin-top: 10px;
+  font-weight: 500;
+  color: #6c757d;
+}
+
+.maquina-card .status-label {
+  font-weight: 600;
+  margin-right: 5px;
+}
+
+.icon-fuel, .icon-analytics {
+  margin-right: 10px;
+  color: #007bff;
+}
+
+/* Loader */
+.dashboard-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  flex-direction: column;
+}
+
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.dashboard-error {
+  color: #f72585;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* Métricas Generales */
+.analytics-section {
+  margin-top: 40px;
 }
 
 .metrics-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
-  margin-bottom: 40px;
 }
 
 .metric-card {
-  background: white;
-  border-radius: 10px;
-  padding: 25px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
 }
 
 .metric-card h3 {
-  margin-top: 0;
-  color: #666;
   font-size: 16px;
+  color: #2b2d42;
+  margin-bottom: 10px;
 }
 
 .metric-value {
   font-size: 32px;
   font-weight: 700;
-  margin: 10px 0;
   color: #2b2d42;
 }
 
 .metric-change {
   font-size: 14px;
+  color: #007bff;
 }
 
 .metric-change.positive {
-  color: #4cc9f0;
+  color: #28a745;
 }
 
 .metric-change.negative {
@@ -93,17 +224,5 @@
 }
 
 .metric-change.neutral {
-  color: #7209b7;
-}
-
-.recent-activity {
-  background: white;
-  border-radius: 10px;
-  padding: 25px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-}
-
-.recent-activity h2 {
-  margin-top: 0;
-  color: #2b2d42;
+  color: #6c757d;
 }

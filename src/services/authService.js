@@ -1,12 +1,9 @@
 import { buildApiUrl, API_CONFIG } from '../config/api';
 
-const API_BASE_URL = API_CONFIG.BASE_URL;
-
 class AuthService {
-  // Función para registrar un nuevo usuario
+  // Registrar nuevo usuario
   async register(username, password, email, role) {
     try {
-      // Crear URL con query parameters
       const url = new URL(buildApiUrl(API_CONFIG.ENDPOINTS.REGISTER));
       url.searchParams.append('username', username);
       url.searchParams.append('password', password);
@@ -27,16 +24,14 @@ class AuthService {
 
       return await response.json();
     } catch (error) {
+      console.error('Error en register:', error);
       throw new Error(error.message || 'Error de conexión');
     }
   }
 
-  // Función para iniciar sesión
+  // Iniciar sesión
   async login(username, password) {
     try {
-      console.log('Intentando login con:', { username, password });
-      
-      // Crear URL con query parameters
       const url = new URL(buildApiUrl(API_CONFIG.ENDPOINTS.LOGIN));
       url.searchParams.append('username', username);
       url.searchParams.append('password', password);
@@ -48,90 +43,63 @@ class AuthService {
         }
       });
 
-      console.log('Respuesta del servidor:', response.status);
-
       if (!response.ok) {
-        console.log('Error response status:', response.status);
-        
-        let errorData;
-        try {
-          errorData = await response.json();
-          console.log('Error response body:', errorData);
-        } catch (parseError) {
-          console.log('Could not parse error response as JSON');
-          errorData = { detail: `Error ${response.status}: ${response.statusText}` };
-        }
-        
-        if (errorData.detail && Array.isArray(errorData.detail)) {
-          const errorMessages = errorData.detail.map(err => 
-            typeof err === 'object' ? JSON.stringify(err) : err
-          ).join(', ');
-          throw new Error(errorMessages);
-        } else if (errorData.detail) {
-          throw new Error(errorData.detail);
-        } else {
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
+        const errorData = await response.json();
+        console.error('Error en login:', errorData); // Depuración
+        throw new Error(errorData.detail || 'Error en el login');
       }
 
       const data = await response.json();
-      console.log('Datos de login:', data);
-      
-      // Guardar el token en localStorage
-      if (data.token) {
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('userRole', data.role);
-      }
-
+      console.log('Login exitoso, datos:', data); // Depuración
+      this._handleTokenResponse(data);
       return data;
     } catch (error) {
-      console.error('Error en login:', error);
+      console.error('Error en login:', error); 
       throw new Error(error.message || 'Error de conexión');
     }
   }
 
-  // Función para cerrar sesión
+  // Manejar la respuesta del token
+  _handleTokenResponse(data) {
+    if (!data.token) {
+      throw new Error('No se recibió token en la respuesta');
+    }
+    console.log('Token recibido:', data.token); // Depuración
+    localStorage.setItem('authToken', data.token);
+    if (data.role) localStorage.setItem('userRole', data.role);
+    if (data.user_id) localStorage.setItem('userId', data.user_id);
+  }
+
+  // Cerrar sesión
   logout() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userRole');
+    localStorage.removeItem('userId');
   }
 
-  // Función para obtener el token actual
+  // Obtener token
   getToken() {
-    return localStorage.getItem('authToken');
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      console.error("Token no encontrado en localStorage");
+      return null;
+    }
+    return token;
   }
 
-  // Función para verificar si el usuario está autenticado
+  // Verificar autenticación
   isAuthenticated() {
-    return !!this.getToken();
-  }
-
-  // Función para hacer peticiones autenticadas
-  async authenticatedRequest(url, options = {}) {
     const token = this.getToken();
     if (!token) {
-      throw new Error('No hay token de autenticación');
+      return false;
     }
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'token': token,
-        'Content-Type': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        this.logout();
-        throw new Error('Sesión expirada');
-      }
-      throw new Error('Error en la petición');
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      console.error("Token inválido, formato incorrecto");
+      return false;
     }
-
-    return response.json();
+    return true;
   }
 }
 
-export default new AuthService(); 
+export default new AuthService();

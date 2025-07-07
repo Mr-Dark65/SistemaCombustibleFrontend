@@ -1,189 +1,274 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import fuelService from '../services/fuelService';
+import './FuelTest.css';
 
 const FuelTest = () => {
-  const [consumptions, setConsumptions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [newConsumption, setNewConsumption] = useState({
-    routeId: '',
-    vehicleId: '',
-    fuelAmount: ''
+  const [state, setState] = useState({
+    consumptions: [],
+    filteredConsumptions: [],
+    loading: false,
+    error: '',
+    searchTerm: '',
+    showModal: false,
+    newConsumption: {
+      routeId: '',
+      vehicleId: '',
+      fuelAmount: ''
+    }
   });
 
-  const handleGetConsumptions = async () => {
-    setLoading(true);
-    setError('');
+  const { consumptions, filteredConsumptions, loading, error, searchTerm, showModal, newConsumption } = state;
+
+  const updateState = (updates) => {
+    setState(prev => ({ ...prev, ...updates }));
+  };
+
+  const loadConsumptions = async () => {
+    updateState({ loading: true, error: '' });
     try {
       const data = await fuelService.listFuelConsumptions();
-      setConsumptions(data);
-      console.log('Consumos obtenidos:', data);
+      updateState({
+        consumptions: data,
+        filteredConsumptions: data,
+        loading: false
+      });
     } catch (err) {
-      setError(err.message);
-      console.error('Error al obtener consumos:', err);
-    } finally {
-      setLoading(false);
+      updateState({
+        error: err.message || 'Error al cargar consumos',
+        loading: false
+      });
     }
+  };
+
+  const handleSearch = (term) => {
+    updateState({ searchTerm: term });
+    if (!term) {
+      updateState({ filteredConsumptions: consumptions });
+      return;
+    }
+    const filtered = consumptions.filter(consumption =>
+      consumption.route_id.toString().includes(term) ||
+      consumption.vehicle_id.toString().includes(term) ||
+      consumption.fuel_amount.toString().includes(term)
+    );
+    updateState({ filteredConsumptions: filtered });
   };
 
   const handleCreateConsumption = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    
+    updateState({ loading: true, error: '' });
+
     try {
-      const result = await fuelService.registerFuelConsumption(
+      // Registrar consumo de combustible
+      await fuelService.registerFuelConsumption(
         parseInt(newConsumption.routeId),
         parseInt(newConsumption.vehicleId),
         parseFloat(newConsumption.fuelAmount)
       );
-      console.log('Consumo registrado:', result);
       
-      // Limpiar formulario
-      setNewConsumption({
-        routeId: '',
-        vehicleId: '',
-        fuelAmount: ''
+      // Recargar los consumos después de registrar
+      await loadConsumptions();
+      updateState({
+        showModal: false,
+        newConsumption: {
+          routeId: '',
+          vehicleId: '',
+          fuelAmount: ''
+        }
       });
-      
-      // Actualizar lista
-      handleGetConsumptions();
     } catch (err) {
-      setError(err.message);
-      console.error('Error al registrar consumo:', err);
-    } finally {
-      setLoading(false);
+      // Manejar error mostrando mensaje más claro
+      updateState({
+        error: err.message || 'Error al registrar consumo',
+        loading: false
+      });
     }
   };
 
   const handleInputChange = (e) => {
-    setNewConsumption({
-      ...newConsumption,
-      [e.target.name]: e.target.value
+    updateState({
+      newConsumption: {
+        ...newConsumption,
+        [e.target.name]: e.target.value
+      }
     });
   };
 
+  useEffect(() => {
+    loadConsumptions();
+  }, []);
+
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-      <h2>Prueba de API de Consumo de Combustible</h2>
-      
-      {/* Obtener Consumos */}
-      <div style={{ marginBottom: '20px' }}>
-        <h3>Obtener Consumos de Combustible</h3>
-        <button 
-          onClick={handleGetConsumptions} 
-          disabled={loading}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          {loading ? 'Cargando...' : 'Obtener Consumos'}
-        </button>
-      </div>
+    <div className="fuel-container">
+      <div className="fuel-header-container">
+        <h1 className="fuel-header">Gestión de Consumo de Combustible</h1>
 
-      {/* Registrar Consumo */}
-      <div style={{ marginBottom: '20px' }}>
-        <h3>Registrar Nuevo Consumo</h3>
-        <form onSubmit={handleCreateConsumption}>
-          <div style={{ marginBottom: '10px' }}>
-            <label>ID de Ruta: </label>
+        <div className="fuel-search-container">
+          <div className="search-bar">
             <input
-              type="number"
-              name="routeId"
-              value={newConsumption.routeId}
-              onChange={handleInputChange}
-              placeholder="1"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
+              type="text"
+              placeholder="Buscar consumos..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              disabled={loading}
             />
+            <button className="search-button" disabled={loading}>
+              🔍
+            </button>
           </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>ID de Vehículo: </label>
-            <input
-              type="number"
-              name="vehicleId"
-              value={newConsumption.vehicleId}
-              onChange={handleInputChange}
-              placeholder="1"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
-            />
-          </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Cantidad de Combustible (L): </label>
-            <input
-              type="number"
-              name="fuelAmount"
-              value={newConsumption.fuelAmount}
-              onChange={handleInputChange}
-              placeholder="50.5"
-              step="0.1"
-              required
-              style={{ marginLeft: '10px', padding: '5px' }}
-            />
-          </div>
+
           <button 
-            type="submit" 
+            onClick={() => updateState({ showModal: true })}
+            className="fuel-button fuel-button-primary"
             disabled={loading}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
           >
-            {loading ? 'Registrando...' : 'Registrar Consumo'}
+            Registrar Consumo
           </button>
-        </form>
+        </div>
       </div>
 
-      {/* Mostrar Error */}
       {error && (
-        <div style={{ 
-          padding: '10px', 
-          backgroundColor: '#f8d7da', 
-          color: '#721c24', 
-          borderRadius: '4px',
-          marginBottom: '20px'
-        }}>
-          {error}
+        <div className="fuel-error">
+          <span>⚠️</span>
+          <div className="error-message">{error}</div>
         </div>
       )}
 
-      {/* Lista de Consumos */}
-      <div>
-        <h3>Consumos de Combustible ({consumptions.length})</h3>
-        {consumptions.length === 0 ? (
-          <p>No hay consumos para mostrar</p>
+      <div className="fuel-content">
+        {loading && filteredConsumptions.length === 0 ? (
+          <div className="fuel-loading">
+            <div className="spinner"></div>
+            <p>Cargando consumos...</p>
+          </div>
         ) : (
-          <div>
-            {consumptions.map((consumption, index) => (
-              <div 
-                key={index} 
-                style={{ 
-                  border: '1px solid #ddd', 
-                  padding: '10px', 
-                  marginBottom: '10px',
-                  borderRadius: '4px'
-                }}
-              >
-                <strong>ID de Ruta:</strong> {consumption.route_id}<br/>
-                <strong>ID de Vehículo:</strong> {consumption.vehicle_id}<br/>
-                <strong>Cantidad:</strong> {consumption.fuel_amount} L
-              </div>
-            ))}
+          <div className="fuel-table-wrapper">
+            <table className="fuel-table">
+              <thead>
+                <tr>
+                  <th>ID Ruta</th>
+                  <th>ID Vehículo</th>
+                  <th>Combustible (L)</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredConsumptions.length > 0 ? (
+                  filteredConsumptions.map((consumption, index) => (
+                    <tr key={index}>
+                      <td>{consumption.route_id}</td>
+                      <td>{consumption.vehicle_id}</td>
+                      <td>{consumption.fuel_amount}</td>
+                      <td>{new Date(consumption.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="fuel-table-empty">
+                      {searchTerm ? 'No se encontraron resultados' : 'No hay consumos registrados'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
+
+      {showModal && (
+        <div className="fuel-modal-overlay">
+          <div className="fuel-modal">
+            <div className="fuel-modal-header">
+              <h2>Registrar Nuevo Consumo</h2>
+              <button 
+                onClick={() => updateState({ 
+                  showModal: false,
+                  newConsumption: {
+                    routeId: '',
+                    vehicleId: '',
+                    fuelAmount: ''
+                  }
+                })}
+                className="fuel-modal-close"
+                disabled={loading}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateConsumption} className="fuel-form">
+              <div className="form-group">
+                <label htmlFor="route-id">ID de Ruta*</label>
+                <input
+                  id="route-id"
+                  type="number"
+                  name="routeId"
+                  value={newConsumption.routeId}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Ej: 1"
+                  min="1"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="vehicle-id">ID de Vehículo*</label>
+                <input
+                  id="vehicle-id"
+                  type="number"
+                  name="vehicleId"
+                  value={newConsumption.vehicleId}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Ej: 1"
+                  min="1"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="fuel-amount">Cantidad (Litros)*</label>
+                <input
+                  id="fuel-amount"
+                  type="number"
+                  name="fuelAmount"
+                  value={newConsumption.fuelAmount}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Ej: 50.5"
+                  step="0.1"
+                  min="0.1"
+                />
+              </div>
+
+              <div className="form-actions">
+                <button 
+                  type="button"
+                  onClick={() => updateState({ 
+                    showModal: false,
+                    newConsumption: {
+                      routeId: '',
+                      vehicleId: '',
+                      fuelAmount: ''
+                    }
+                  })}
+                  className="button secondary"
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="button primary"
+                  disabled={loading}
+                >
+                  {loading ? 'Registrando...' : 'Registrar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default FuelTest; 
+export default FuelTest;
